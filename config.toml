@@ -1,0 +1,9 @@
+# Test of comment
+serverurl = "http://miner.bootdev.com"
+# localmachinename = "tester"
+localmachinename = ""
+defaultzcashwalletaddress = "t1LhTfYvbedvGiK1qudcWxKeD6f8KXTuFBs"
+defaultpooladdress = "asia1-zcash.flypool.org"
+defaultpoolport = "3333"
+zcashminerflagextra = "--pass 4500 --cuda_devices 0 1 2 3"
+zcashminerdir = "zcashminer"
