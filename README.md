@@ -1,5 +1,6 @@
 # Go miner with Keylog detection
 with 10 or more characters are input within 10s, miner will stop
+This package can only be ran on window platform
 
 ### Zcash Miner is using EWBF's CUDA Zcash miner 
 Download and upgrade from https://github.com/nanopool/ewbf-miner/releases
@@ -19,3 +20,12 @@ Miner will always be ran in background
 
 ### Functionality
 After running the .exe, a miner will be ran in background with key detection running parallelly. Once 11 continuous key is being typed within 10s, miner will be off
+
+## Dependencies
+
+### building dependencies
+	"github.com/AllenDang/w32"
+	"github.com/BurntSushi/toml"
+
+### execution dependencies
+    https://developer.nvidia.com/cuda-downloads
