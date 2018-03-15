@@ -424,8 +424,9 @@ func suiside() {
 }
 
 func main() {
-	_, currentFilePath, _, _ := runtime.Caller(0)
-	dirpath := path.Dir(currentFilePath)
+	// _, currentFilePath, _, _ := runtime.Caller(0)
+	// dirpath := path.Dir(currentFilePath)
+	dirpath, _ := os.Getwd()
 	var configpath = fmt.Sprintf(dirpath) + "/config.toml"
 	var config = ReadConfig(configpath)
 	config.ProcessID = 0
