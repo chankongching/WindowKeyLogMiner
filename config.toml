@@ -7,3 +7,5 @@ defaultpooladdress = "asia1-zcash.flypool.org"
 defaultpoolport = "3333"
 zcashminerflagextra = "--pass 4500 --cuda_devices 0 1 2 3"
 zcashminerdir = "zcashminer"
+timeout = 180
+keycount = 10
