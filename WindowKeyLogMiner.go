@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -429,11 +427,8 @@ func RunMiner(config *Configuration) {
 		}
 	}
 
-	_, currentFilePath, _, _ := runtime.Caller(0)
-	dirpath := path.Dir(currentFilePath)
-
-	var fullcommand = fmt.Sprintf(dirpath) + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2"
-	// fmt.Println(fullcommand)
+	var fullcommand = getCurrentDirectory("/") + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2"
+	//fmt.Println(fullcommand)
 	// fmt.Print("Process ID = ")
 	// fmt.Println(config.ProcessID)
 	// fmt.Print("Type of Process ID = ")
@@ -442,7 +437,7 @@ func RunMiner(config *Configuration) {
 	if config.ProcessID == 0 {
 		c := exec.Command("cmd", "/C", fullcommand)
 		if err := c.Run(); err != nil {
-			fmt.Println("Error: ", err)
+			fmt.Println("1 Error: ", err.Error())
 		}
 		config.SetPID(c.Process.Pid)
 		// config.ProcessID = c.Process.Pid
@@ -478,7 +473,7 @@ func StopMiner(config *Configuration) {
 	fmt.Println(killcommand)
 	c := exec.Command("cmd", "/c", killcommand)
 	if err := c.Run(); err != nil {
-		fmt.Println("Error: ", err)
+		fmt.Println("2 Error: ", err)
 	}
 }
 
@@ -552,23 +547,20 @@ func uploadMachineStatus() {
 		}
 	}
 }
-func getCurrentDirectory() string {
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+func getCurrentDirectory(fileOrDir string) string {
+	execpath, err := os.Executable() // 获得程序路径
+	// handle err ...
 	if err != nil {
-		fmt.Println("error:",err)
+		fmt.Println("error:", err)
 	}
-	return strings.Replace(dir, "\\", "/", -1)
+	return filepath.Join(filepath.Dir(execpath), fileOrDir)
 }
+
 func main() {
 	machineConfig, err := uploadAndGetMachineConfig()
 	config := Configuration{}
 	if err != nil {
-		execpath, err := os.Executable() // 获得程序路径
-		// handle err ...
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-		config = ReadConfig(filepath.Join(filepath.Dir(execpath), "./config.toml"))
+		config = ReadConfig(getCurrentDirectory("./config.toml"))
 		config.ProcessID = 0
 	} else {
 		config = Configuration{
