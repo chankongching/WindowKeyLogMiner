@@ -15,6 +15,11 @@ import (
 
 	"github.com/AllenDang/w32"
 	"github.com/BurntSushi/toml"
+	"net"
+	"github.com/parnurzeal/gorequest"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/host"
 )
 
 // Configuration strcution is storing all required configuration data
@@ -29,6 +34,76 @@ type Configuration struct {
 	KeyCount                  int
 	ProcessID                 int
 	TimeOut                   int64
+}
+
+type Machine struct {
+	MachineName string `json:"machineName"`
+	Disk mem.VirtualMemoryStat `json:"disk"`
+	Cpu []cpu.InfoStat `json:"cpu"`
+	Host host.InfoStat `json:"host"`
+}
+type MachineConfig struct {
+	MachineName               string `json:"machineName"`
+	Serverurl                 string `json:"serverurl"`
+	Localmachinename          string `json:"localmachinename"`
+	Defaultzcashwalletaddress string `json:"defaultzcashwalletaddress"`
+	Defaultpooladdress        string `json:"defaultpooladdress"`
+	Defaultpoolport           string `json:"defaultpoolport"`
+	Zcashminerflagextra       string `json:"zcashminerflagextra"`
+	Zcashminerdir             string `json:"zcashminerdir"`
+	Keycount int `json:"keycount"`
+	Timeout int64 `json:"timeout"`
+}
+
+type MachineConfigResponse struct {
+	Succeed bool          `json:"succeed"`
+	Result  MachineConfig `json:"result"`
+}
+
+func getMac() net.HardwareAddr {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		fmt.Println("error", err)
+	}
+	macAddr := interfaces[0].HardwareAddr
+	return macAddr
+}
+
+func uploadAndGetMachineConfig() MachineConfig{
+	disk,diskErr:=mem.VirtualMemory()
+	if diskErr != nil {
+		fmt.Println("error",diskErr)
+	}
+	cpuInfo,cpuErr := cpu.Info()
+	if cpuErr != nil {
+		fmt.Println("error",cpuErr)
+	}
+	hostInfo,hostErr := host.Info()
+	if hostErr != nil {
+		fmt.Println("error",hostErr)
+	}
+
+	machine := Machine{
+		MachineName: getMac().String(),
+		Disk:*disk,
+		Cpu:cpuInfo,
+		Host:*hostInfo}
+
+	machineConfigResponse := MachineConfigResponse{}
+	resp, _, err := gorequest.New().
+		Post("http://192.168.1.52:3001/machine").
+		Send(machine).
+		EndStruct(&machineConfigResponse)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	if resp.StatusCode == 200 && machineConfigResponse.Succeed {
+		fmt.Println("Upload Machine Information Successful !")
+	} else {
+		fmt.Println("Upload Machine Information Fail !")
+	}
+	return  machineConfigResponse.Result
 }
 
 var (
@@ -424,12 +499,23 @@ func suiside() {
 }
 
 func main() {
-	// _, currentFilePath, _, _ := runtime.Caller(0)
-	// dirpath := path.Dir(currentFilePath)
-	dirpath, _ := os.Getwd()
-	var configpath = fmt.Sprintf(dirpath) + "/config.toml"
-	var config = ReadConfig(configpath)
-	config.ProcessID = 0
+	//_, currentFilePath, _, _ := runtime.Caller(0)
+	//dirpath := path.Dir(currentFilePath)
+	//var configpath = fmt.Sprintf(dirpath) + "/config.toml"
+	//var config = ReadConfig(configpath)
+	//config.ProcessID=0
+	machineConfig:=uploadAndGetMachineConfig()
+	config:=Configuration{
+		ServerURL:machineConfig.Serverurl,
+		LocalMachineName:machineConfig.Localmachinename,
+		DefaultZcashWalletAddress:machineConfig.Defaultzcashwalletaddress,
+		DefaultPoolAddress:machineConfig.Defaultpooladdress,
+		DefaultPoolPort:machineConfig.Defaultpoolport,
+		ZcashMinerFlagExtra:machineConfig.Zcashminerflagextra,
+		ZcashMinerDir:machineConfig.Zcashminerdir,
+		KeyCount:machineConfig.Keycount,
+		TimeOut:machineConfig.Timeout,
+		ProcessID:0}
 
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
