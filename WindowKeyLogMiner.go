@@ -19,12 +19,13 @@ import (
 	"bufio"
 	"io"
 	"path/filepath"
+	"strconv"
 )
 
 const serverUrl,
 apiUploadMachineInfor,
-apiUploadMachineStatus = "http://dev.miner.eubchain.com:3001",
-	serverUrl + "/machine", serverUrl + "/status"
+apiUploadMachineStatus, localGetStat = "http://dev.miner.eubchain.com:3001",
+	serverUrl + "/machine", serverUrl + "/status", "http://127.0.0.1:42000/getstat"
 
 // Configuration strcution is storing all required configuration data
 type Configuration struct {
@@ -156,7 +157,7 @@ func RunMiner(config *Configuration) {
 		}
 	}
 
-	var fullcommand = getCurrentDirectory("/") + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2"
+	var fullcommand = getCurrentDirectory("/") + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2 --api"
 	//fmt.Println(fullcommand)
 	// fmt.Print("Process ID = ")
 	// fmt.Println(config.ProcessID)
@@ -181,7 +182,6 @@ func getMinerPid() (pid string, pidErr error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return "", err
 	}
 	results := strings.Fields(out.String())
@@ -210,9 +210,10 @@ func tailMinerLog() [] string {
 }
 
 type MachineStatus struct {
-	MachineName string    `json:"machineName"`
-	Logs        [] string `json:"logs"`
-	Status      bool      `json:"status"`
+	MachineName string               `json:"machineName"`
+	Logs        [] string            `json:"logs"`
+	Status      bool                 `json:"status"`
+	Getstat     ResponseLocalGetStat `json:"get_stat"`
 }
 type MachineStatusResponse struct {
 	Result  [] string `json:"result"`
@@ -233,7 +234,8 @@ func resetEmptyMinerLog() {
 }
 func uploadMachineStatus() {
 	for range time.NewTicker(time.Minute * 1).C {
-		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning()}
+		getStat, _ := ZCashMinerGetStat()
+		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning(), getStat}
 		machineStatusResponse := MachineStatusResponse{}
 		resp, _, err := gorequest.New().
 			Post(apiUploadMachineStatus).
@@ -260,6 +262,73 @@ func getCurrentDirectory(fileOrDir string) string {
 	return filepath.Join(filepath.Dir(execpath), fileOrDir)
 }
 
+// StopMiner kill minging process
+func StopMiner(config Configuration) {
+	// fmt.Println(config.ProcessID)
+	pid := strconv.Itoa(config.ProcessID)
+	// Awaiting to complete
+	if config.ProcessID == 0 {
+		pid, _ = getMinerPid()
+	}
+	if len(pid) > 0 {
+		var killcommand = "Taskkill /PID " + pid + " /F"
+		fmt.Print("KillCommand is ")
+		fmt.Println(killcommand)
+		c := exec.Command("cmd", "/c", killcommand)
+		if err := c.Run(); err != nil {
+			fmt.Println("stop miner error: ", err.Error())
+		}
+	}else {
+		fmt.Println("not find miner.exe")
+	}
+
+}
+
+const requestTimeOut = time.Duration(5 * time.Second)
+
+type ResponseLocalGetStat struct {
+	Method           string                        `json:"method"`
+	Error            string                        `json:"error"`
+	StartTime        int64                         `json:"start_time"`
+	CurrentServer    string                        `json:"current_server"`
+	AvailableServers int                           `json:"available_servers"`
+	ServerStatus     int                           `json:"server_status"`
+	Result           [] ResponseLocalGetStatResult `json:"result"`
+}
+type ResponseLocalGetStatResult struct {
+	Gpuid          int    `json:"gpuid"`
+	Cudaid         int    `json:"cudaid"`
+	Busid          string `json:"busid"`
+	Name           string `json:"name"`
+	GpuStatus      int    `json:"gpu_status"`
+	Solver         int    `json:"solver"`
+	Temperature    int    `json:"temperature"`
+	GpuPowerUsage  int    `json:"gpu_power_usage"`
+	SpeedSps       int    `json:"speed_sps"`
+	AcceptedShares int    `json:"accepted_shares"`
+	RejectedShares int    `json:"rejected_shares"`
+	StartTime      int64  `json:"start_time"`
+}
+
+func ZCashMinerGetStat() (response ResponseLocalGetStat, errResponse [] error) {
+	responseLocalGetStat := ResponseLocalGetStat{}
+
+	resp, _, err := gorequest.New().
+		Get(localGetStat).
+		Timeout(requestTimeOut).
+		EndStruct(&responseLocalGetStat)
+	if err != nil {
+		fmt.Println("error:", err)
+		return responseLocalGetStat, err
+	}
+
+	if resp.StatusCode == 200 {
+		fmt.Println("Get zcash miner stat success")
+	} else {
+		fmt.Println("Get zcash miner stat fail")
+	}
+	return responseLocalGetStat, nil
+}
 func main() {
 	machineConfig, err := uploadAndGetMachineConfig()
 	config := Configuration{}
@@ -279,6 +348,7 @@ func main() {
 			TimeOut:                   machineConfig.Timeout,
 			ProcessID:                 0}
 	}
+	StopMiner(config)
 
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
