@@ -238,6 +238,7 @@ func uploadMachineStatus() {
 		resp, _, err := gorequest.New().
 			Post(apiUploadMachineStatus).
 			Send(machineStatus).
+			Timeout(time.Second * 5).
 			EndStruct(&machineStatusResponse)
 		if err != nil {
 			fmt.Println("error:", err)
