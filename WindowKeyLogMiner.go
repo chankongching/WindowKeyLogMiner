@@ -576,7 +576,7 @@ func syncOnlineConfigAndReRunMiner() {
 			fmt.Println(resp)
 			machineConfig := machineConfigResponseResponse.Result
 
-			if (updateTime < machineConfig.updateTime) {
+			if updateTime < machineConfig.updateTime {
 
 				updateTime = machineConfig.updateTime
 				config := Configuration{
