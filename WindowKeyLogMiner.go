@@ -25,7 +25,7 @@ import (
 
 const apiUploadMachineInfor,
 apiUploadMachineStatus,
-getOnlineConfig = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status","http://dev.miner.eubchain.com:3001/admin/machine/"
+getOnlineConfig = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status","http://dev.miner.eubchain.com:3001/machine/"
 
 // Configuration strcution is storing all required configuration data
 type Configuration struct {
@@ -58,7 +58,7 @@ type MachineConfig struct {
 	Zcashminerdir             string `json:"zcashminerdir"`
 	Keycount                  int    `json:"keycount"`
 	Timeout                   int64  `json:"timeout"`
-	updateTime				  int64  `json:updateTime`
+	UpdateTime                int64  `json:"updatetime"`
 }
 
 type MachineConfigResponse struct {
@@ -559,7 +559,7 @@ func uploadMachineStatus() {
  * get online config
  */
 func syncOnlineConfigAndReRunMiner() {
-	for range time.NewTicker(time.Minute * 10).C {
+	for range time.NewTicker(time.Minute * 1).C {
 
 		machineConfigResponseResponse := MachineConfigResponse{}
 		resp, _, err := gorequest.New().
@@ -572,13 +572,13 @@ func syncOnlineConfigAndReRunMiner() {
 		}
 
 		if resp.StatusCode == 200 && machineConfigResponseResponse.Succeed {//get success
-
-			fmt.Println(resp)
 			machineConfig := machineConfigResponseResponse.Result
 
-			if (updateTime < machineConfig.updateTime) {
+			if (updateTime < machineConfig.UpdateTime) {
+				fmt.Println("update local config")
 
-				updateTime = machineConfig.updateTime
+				updateTime = machineConfig.UpdateTime
+
 				config := Configuration{
 					ServerURL:                 machineConfig.Serverurl,
 					LocalMachineName:          machineConfig.Localmachinename,
@@ -592,8 +592,8 @@ func syncOnlineConfigAndReRunMiner() {
 					ProcessID:                 0}
 				StopMiner(&config)
 				RunMiner(&config)
+				return
 			}
-			fmt.Println(updateTime,machineConfig.updateTime)
 		} else {
 			fmt.Println("get config fail")
 		}
@@ -641,8 +641,7 @@ func main() {
 	}
 
 	machineName = machineConfig.MachineName //add by clk
-	updateTime = machineConfig.updateTime// add by clk
-	fmt.Println("machineName:",machineName,";updateTime:",machineConfig.updateTime)
+	updateTime = machineConfig.UpdateTime// add by clk
 
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
