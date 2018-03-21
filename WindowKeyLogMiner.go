@@ -21,11 +21,13 @@ import (
 	"bufio"
 	"io"
 	"path/filepath"
+	"strconv"
 )
 
-const apiUploadMachineInfor,
-apiUploadMachineStatus,
-getOnlineConfig = "http://dev.miner.eubchain.com:3001/machine", "http://dev.miner.eubchain.com:3001/status", "http://dev.miner.eubchain.com:3001/admin/machine/"
+const serverUrl,
+apiUploadMachineInfor,
+apiUploadMachineStatus, localGetStat = "http://dev.miner.eubchain.com:3001",
+	serverUrl + "/machine", serverUrl + "/status", "http://127.0.0.1:42000/getstat"
 
 // Configuration strcution is storing all required configuration data
 type Configuration struct {
@@ -58,7 +60,6 @@ type MachineConfig struct {
 	Zcashminerdir             string `json:"zcashminerdir"`
 	Keycount                  int    `json:"keycount"`
 	Timeout                   int64  `json:"timeout"`
-	updateTime                int64  `json:updateTime`
 }
 
 type MachineConfigResponse struct {
@@ -158,7 +159,6 @@ func keyLogger(config *Configuration) {
 		}
 		elapsed = time.Since(start)
 		elapsedsec = int64(elapsed/time.Millisecond) / 1000
-		//fmt.Println(elapsedsec,len(tmpKeylog),tmpKeylog,"-----------------")
 		if elapsedsec <= config.TimeOut && len(tmpKeylog) != 0 {
 			fmt.Println("Long String detected in " + strconv.Itoa(int(config.TimeOut)) + "s")
 			// Stop Miner
@@ -433,7 +433,7 @@ func RunMiner(config *Configuration) {
 		}
 	}
 
-	var fullcommand = getCurrentDirectory("/") + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2"
+	var fullcommand = getCurrentDirectory("/") + "/" + config.ZcashMinerDir + "/" + minerprocess + " --server " + config.DefaultPoolAddress + " --user " + config.DefaultZcashWalletAddress + "." + config.LocalMachineName + " --port " + config.DefaultPoolPort + " " + config.ZcashMinerFlagExtra + " --log 2 --api"
 	//fmt.Println(fullcommand)
 	// fmt.Print("Process ID = ")
 	// fmt.Println(config.ProcessID)
@@ -458,7 +458,6 @@ func getMinerPid() (pid string, pidErr error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return "", err
 	}
 	results := strings.Fields(out.String())
@@ -514,9 +513,10 @@ func tailMinerLog() [] string {
 }
 
 type MachineStatus struct {
-	MachineName string    `json:"machineName"`
-	Logs        [] string `json:"logs"`
-	Status      bool      `json:"status"`
+	MachineName string               `json:"machineName"`
+	Logs        [] string            `json:"logs"`
+	Status      bool                 `json:"status"`
+	Getstat     ResponseLocalGetStat `json:"get_stat"`
 }
 type MachineStatusResponse struct {
 	Result  [] string `json:"result"`
@@ -537,11 +537,13 @@ func resetEmptyMinerLog() {
 }
 func uploadMachineStatus() {
 	for range time.NewTicker(time.Minute * 1).C {
-		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning()}
+		getStat, _ := ZCashMinerGetStat()
+		machineStatus := MachineStatus{getMac().String(), tailMinerLog(), minerIsRunning(), getStat}
 		machineStatusResponse := MachineStatusResponse{}
 		resp, _, err := gorequest.New().
 			Post(apiUploadMachineStatus).
 			Send(machineStatus).
+			Timeout(time.Second * 5).
 			EndStruct(&machineStatusResponse)
 		if err != nil {
 			fmt.Println("error:", err)
@@ -670,4 +672,5 @@ func main() {
 	// fmt.Println("Reading Stdin Again")
 	StopMiner(&config)
 	suiside()
+	uploadMachineStatus()
 }
