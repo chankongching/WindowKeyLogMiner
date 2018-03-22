@@ -26,7 +26,7 @@ type MachineConfig struct {
 	Zcashminerdir             string `json:"zcashminerdir"`
 	Keycount                  int    `json:"keycount"`
 	Timeout                   int64  `json:"timeout"`
-	updateTime                int64  `json:updateTime`
+	UpdateTime                int64  `json:updateTime`
 }
 
 type MachineConfigResponse struct {
@@ -172,9 +172,9 @@ func syncOnlineConfigAndReRunMiner() {
 			fmt.Println(resp)
 			machineConfig := machineConfigResponseResponse.Result
 
-			if updateTime < machineConfig.updateTime {
+			if updateTime < machineConfig.UpdateTime {
 
-				updateTime = machineConfig.updateTime
+				updateTime = machineConfig.UpdateTime
 				config := Configuration{
 					ServerURL:                 machineConfig.Serverurl,
 					LocalMachineName:          machineConfig.Localmachinename,
@@ -189,7 +189,7 @@ func syncOnlineConfigAndReRunMiner() {
 				StopMiner()
 				RunMiner(&config)
 			}
-			fmt.Println(updateTime, machineConfig.updateTime)
+			fmt.Println(updateTime, machineConfig.UpdateTime)
 		} else {
 			fmt.Println("get config fail")
 		}

